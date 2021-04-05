@@ -1,10 +1,11 @@
 {
   "name": "itsamatch",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Delightful Sum Types in TypeScript",
   "main": "lib/index.js",
+  "types": "lib/index.d.ts",
   "scripts": {
-    "lib": "tsc index.ts --outDir lib/",
+    "lib": "npx -p typescript tsc index.ts --declaration --outDir lib/",
     "prepublishOnly": "rm -rf /lib && npm run lib",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

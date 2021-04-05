@@ -7,7 +7,7 @@ import { DataType, match, VariantOf, genConstructors } from '..';
 type Value = DataType<{
     Num: { data: number },
     Bool: { data: boolean },
-    Nil: { data: 'nil' },
+    Nil: {},
     Cons: { head: Value, tail: Value },
     Closure: { arg: string, body: Expr, env: Env },
     RecClosure: { name: string, arg: string, body: Expr, env: Env }
@@ -31,7 +31,7 @@ type Expr = DataType<{
 
 // generate constructors for all the needed variants
 
-const { Bool, Num, Closure, RecClosure, Cons, ...exprCtors } = genConstructors<Value>()(
+const { Bool, Num, Closure, RecClosure, Cons, Nil } = genConstructors<Value>()(
     'Bool', 'Num', 'Nil', 'Cons', 'Closure', 'RecClosure'
 );
 
@@ -41,9 +41,6 @@ const {
 } = genConstructors<Expr>()(
     'Const', 'MonOp', 'BinOp', 'Var', 'LetIn', 'If', 'Lambda', 'App', 'LetRecIn'
 );
-
-// shorthand constructor for Nil
-const Nil = () => exprCtors.Nil({ data: 'nil' });
 
 // an environment is a mapping from variable names to values
 type Env = { [K in string]: Value };
@@ -271,7 +268,7 @@ const listPrimes = (upTo: number) => LetRecIn({
     }),
     inExpr: App({
         left: App({ left: Var({ name: 'listPrimes' }), right: Const({ value: Num({ data: upTo }) }) }),
-        right: Const({ value: Nil() })
+        right: Const({ value: Nil({}) })
     })
 });
 

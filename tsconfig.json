@@ -1,0 +1,11 @@
+{
+    "compilerOptions": {
+        "module": "es6",
+        "outDir": "lib",
+        "strict": true,
+        "moduleResolution": "Node"
+    },
+    "exclude": [
+        "node_modules"
+    ],
+}

@@ -1,0 +1,27 @@
+{
+  "name": "itsamatch",
+  "version": "1.0.0",
+  "description": "Delightful Sum Types in TypeScript",
+  "main": "lib/index.js",
+  "scripts": {
+    "lib": "tsc index.ts --outDir lib/",
+    "prepublishOnly": "rm -rf /lib && npm run lib",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nathsou/ItsAMatch.git"
+  },
+  "keywords": [
+    "algebraic-data-types",
+    "functional-programming",
+    "sum-types",
+    "pattern-matching"
+  ],
+  "author": "Nathan Soufflet",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/nathsou/ItsAMatch/issues"
+  },
+  "homepage": "https://github.com/nathsou/ItsAMatch#readme"
+}

@@ -1,7 +1,11 @@
 /**
  * Defines a data-type variant named `Name` and constructed with `Props`
  */
-export type Variant<Name extends string, Props extends Record<string, any> = {}> = { variant: Name } & Props;
+export type Variant<
+  Name extends string,
+  Tag extends string = 'variant',
+  Props extends Record<string, any> = {},
+  > = { [K in Tag]: Name } & Props;
 
 /**
  * Maps each property in `T` to a Variant constructed with the associated type
@@ -12,36 +16,43 @@ export type Variant<Name extends string, Props extends Record<string, any> = {}>
  *     Car: { color: 'red' | 'blue' }
  * }>;
  */
-export type DataType<T extends { [K in keyof T]: Record<string, any> }> = {
-    [K in keyof T]: K extends string ? Variant<K, T[K]> : never
-}[keyof T];
+export type DataType<
+  T extends { [K in keyof T]: Record<string, any> },
+  Tag extends string = 'variant'
+  > = {
+    [K in keyof T]: K extends string ? Variant<K, Tag, T[K]> : never
+  }[keyof T];
 
 /**
  * Returns the type of the variant named `Name` in the data-type `T`
  */
-export type VariantOf<T extends Variant<string>, Name extends T['variant']> = T & Variant<Name>;
+export type VariantOf<
+  T extends Variant<string, Tag>,
+  Name extends T[Tag],
+  Tag extends string = 'variant'
+  > = T & Variant<Name, Tag>;
 
 /**
  * Returns the union of the return types of every function in `T`
  */
 type Ret<T> = {
-    [K in keyof T]: T[K] extends (...args: any) => infer R ? R : never
+  [K in keyof T]: T[K] extends (...args: any) => infer R ? R : never
 }[keyof T];
 
 /**
  * Maps each variant of `DT` to a handler function returning `R`
  */
-type Cases<DT extends Variant<string>, R> = {
-    [V in DT['variant']]: ((args: {
-        [K in keyof (DT & Variant<V>)]: (DT & Variant<V>)[K]
-    }) => R)
+type Cases<DT extends Variant<string, Tag>, R, Tag extends string> = {
+  [V in DT[Tag]]: ((args: {
+    [K in keyof (DT & Variant<V, Tag>)]: (DT & Variant<V, Tag>)[K]
+  }) => R)
 };
 
 /**
  * Same as `Cases` but accepting an optional default handler '_'
  */
-type CasesWithDefault<T extends Variant<string>, R = any> =
-    Cases<T, R> | (Partial<Cases<T, R>> & { _: (val: T) => R });
+type CasesWithDefault<T extends Variant<string, Tag>, Tag extends string, R = any> =
+  Cases<T, R, Tag> | (Partial<Cases<T, R, Tag>> & { _: (val: T) => R });
 
 /**
  * @param val A variant of data-type `DT`
@@ -62,35 +73,49 @@ type CasesWithDefault<T extends Variant<string>, R = any> =
 *     _: ({ variant: vehicleName }) => `I do not own a ${vehicleName}`
 * });
  */
-export const match = <DT extends Variant<string>, M extends CasesWithDefault<DT>>(
+export const match = <
+  DT extends Variant<string, Tag>,
+  M extends CasesWithDefault<DT, Tag>,
+  Tag extends string = 'variant',
+  >(
     val: DT,
-    cases: M
-): Ret<M> => {
-    if (cases.hasOwnProperty(val.variant)) {
-        const handler = (cases as Record<string, (arg: DT) => Ret<M>>)[val.variant];
-        return handler(val);
-    }
+    cases: M,
+    tag: Tag = 'variant' as Tag
+  ): Ret<M> => {
+  if (val[tag] in cases) {
+    const handler = (cases as Record<string, (arg: DT) => Ret<M>>)[val[tag]];
+    return handler(val);
+  }
 
-    const defaultHandler = (cases as Record<'_', (arg: DT) => Ret<M>>)['_'];
-    return defaultHandler(val);
+  const defaultHandler = (cases as Record<'_', (arg: DT) => Ret<M>>)['_'];
+  return defaultHandler(val);
 };
 
-type VariantConstructor<T extends Variant<string>, Name extends T['variant']> =
-    (args: Omit<VariantOf<T, Name>, 'variant'>) => VariantOf<T, Name>;
+type VariantConstructor<
+  T extends Variant<string, Tag>,
+  Name extends T[Tag],
+  Tag extends string
+  > =
+  (args: Omit<VariantOf<T, Name, Tag>, Tag>) => VariantOf<T, Name, Tag>;
 
 const constructorOf = <
-    T extends Variant<string>,
-    Name extends T['variant']
->(variant: Name) => {
-    return (args => ({
-        variant,
-        ...args
-    })) as VariantConstructor<VariantOf<T, Name>, Name>;
+  T extends Variant<string, Tag>,
+  Name extends T[Tag],
+  Tag extends string
+>(variant: Name, tag: Tag) => {
+  return (args => ({
+    [tag]: variant,
+    ...args
+  })) as VariantConstructor<VariantOf<T, Name, Tag>, VariantOf<T, Name, Tag>[Tag], Tag>;
 };
 
-type VariantConstructors<T extends Variant<string>, Names extends string> = {
-    [V in Names]: VariantConstructor<VariantOf<T, V>, V>
-};
+type VariantConstructors<
+  T extends Variant<string, Tag>,
+  Names extends T[Tag],
+  Tag extends string
+  > = {
+    [V in Names]: VariantConstructor<VariantOf<T, V, Tag>, VariantOf<T, V, Tag>[Tag], Tag>
+  };
 
 /**
  * Generates a default variant constructor factory for data-type `DT` that accepts a list of variant names
@@ -107,12 +132,15 @@ type VariantConstructors<T extends Variant<string>, Names extends string> = {
  * const uni = Unicycle({ year: 2017, wheelSize: 36 });
  * 
  */
-export const genConstructors = <DT extends Variant<string>>() =>
-    <Variants extends DT['variant']>(...variants: Variants[]): VariantConstructors<DT, Variants> => {
-        type R = VariantConstructors<DT, Variants>;
-        return variants.reduce<R>((ctors, variant) => {
-            /// @ts-ignore
-            ctors[variant] = constructorOf<DT>(variant);
-            return ctors;
-        }, {} as R);
-    };
+export const genConstructors = <
+  DT extends Variant<string, Tag>,
+  Tag extends string = 'variant'
+>(tag: Tag = 'variant' as Tag) =>
+  <Variants extends DT[Tag]>(...variants: Variants[]): VariantConstructors<DT, Variants, Tag> => {
+    type R = VariantConstructors<DT, Variants, Tag>;
+    return variants.reduce<R>((ctors, variant) => {
+      /// @ts-ignore
+      ctors[variant] = constructorOf<DT>(variant, tag);
+      return ctors;
+    }, {} as R);
+  };

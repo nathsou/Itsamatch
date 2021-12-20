@@ -1,8 +1,7 @@
 {
   "name": "itsamatch",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Delightful Sum Types in TypeScript",
-  "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "scripts": {
     "lib": "npx -p typescript tsc index.ts --declaration --outDir lib/",

@@ -3,7 +3,7 @@
 
 # It's a match!
 
-itsamatch is a tiny set of types and utilities to define and use variants / tagged unions / sum types in a more declarative way in TypeScript.
+Itsamatch is a tiny set of types and utilities to define and use variants / tagged unions / sum types in a more declarative way in TypeScript.
 
 ## Usage
 

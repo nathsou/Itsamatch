@@ -7,7 +7,7 @@ type Term = DataType<{
 }>;
 
 // generate constructors for Var and Fun
-const { Var, Fun } = genConstructors<Term>()('Var', 'Fun');
+const { Var, Fun } = genConstructors<Term>(['Var', 'Fun']);
 
 const showTerm = (term: Term): string => match(term, {
   Var: ({ name }) => name,

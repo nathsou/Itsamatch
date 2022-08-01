@@ -118,7 +118,7 @@ type VariantConstructors<
   };
 
 /**
- * Generates a default variant constructor factory for data-type `DT` that accepts a list of variant names
+ * Generates default variant constructors for data-type `DT`
  * @example 
  * type Vehicle = DataType<{
  *     Bike: { wheelSize: number },
@@ -126,21 +126,20 @@ type VariantConstructors<
  *     Car: { color: 'red' | 'blue' }
  * }>;
  * 
- * const ctorFactory = genConstructors<Vehicle>();
- * const { Bike, Unicycle } = ctorFactory('Bike', 'Unicycle');
+ * const { Bike, Unicycle } = genConstructors<Vehicle>(['Bike', 'Unicycle']);
  * 
  * const uni = Unicycle({ year: 2017, wheelSize: 36 });
  * 
  */
 export const genConstructors = <
   DT extends Variant<string, Tag>,
-  Tag extends string = 'variant'
->(tag: Tag = 'variant' as Tag) =>
-  <Variants extends DT[Tag]>(...variants: Variants[]): VariantConstructors<DT, Variants, Tag> => {
-    type R = VariantConstructors<DT, Variants, Tag>;
-    return variants.reduce<R>((ctors, variant) => {
-      /// @ts-ignore
-      ctors[variant] = constructorOf<DT>(variant, tag);
-      return ctors;
-    }, {} as R);
-  };
+  Tag extends string = 'variant',
+  Variants extends DT[Tag] = DT[Tag],
+  >(variants: Variants[], tag = 'variant' as Tag): VariantConstructors<DT, Variants, Tag> => {
+  type R = VariantConstructors<DT, Variants, Tag>;
+  return variants.reduce<R>((ctors, variant) => {
+    /// @ts-ignore
+    ctors[variant] = constructorOf<DT>(variant, tag);
+    return ctors;
+  }, {} as R);
+};

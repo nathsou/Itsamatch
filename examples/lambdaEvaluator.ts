@@ -31,16 +31,16 @@ type Expr = DataType<{
 
 // generate constructors for all the needed variants
 
-const { Bool, Num, Closure, RecClosure, Cons, Nil } = genConstructors<Value>()(
+const { Bool, Num, Closure, RecClosure, Cons, Nil } = genConstructors<Value>([
   'Bool', 'Num', 'Nil', 'Cons', 'Closure', 'RecClosure'
-);
+]);
 
 const {
   Const, BinOp, Var,
   If, Lambda, App, LetRecIn
-} = genConstructors<Expr>()(
+} = genConstructors<Expr>([
   'Const', 'MonOp', 'BinOp', 'Var', 'LetIn', 'If', 'Lambda', 'App', 'LetRecIn'
-);
+]);
 
 // an environment is a mapping from variable names to values
 type Env = { [K in string]: Value };

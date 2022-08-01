@@ -20,7 +20,7 @@ type List<T> = DataType<{
 }>;
 
 // generate default variant constructors for lists of numbers
-const { Nil, Cons } = genConstructors<List<number>>()('Nil', 'Cons');
+const { Nil, Cons } = genConstructors<List<number>>(['Nil', 'Cons']);
 
 // use the match function to compute the length of a list
 const len = <T>(list: List<T>): number => match(list, {

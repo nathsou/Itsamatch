@@ -5,7 +5,7 @@ type List<T> = DataType<{
   Cons: { head: T, tail: List<T> }
 }>;
 
-const { Nil, Cons } = genConstructors<List<number>>()('Nil', 'Cons');
+const { Nil, Cons } = genConstructors<List<number>>(['Nil', 'Cons']);
 
 const len = <T>(list: List<T>): number => match(list, {
   Nil: () => 0,

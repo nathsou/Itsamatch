@@ -162,7 +162,7 @@ export const matchMany = <
   const key = values.map(v => v[tag]).join(' ');
 
   if (key in cases) {
-    return cases[key](...values);
+    return (cases as Record<string, (...args: DTs) => Ret<Cases>>)[key](...values);
   }
 
   if ('_' in cases) {

@@ -1,4 +1,4 @@
-import { DataType, genConstructors, match } from "..";
+import { DataType, genConstructors, match, matchMany } from "..";
 
 type List<T> = DataType<{
   Nil: {},
@@ -12,7 +12,12 @@ const len = <T>(list: List<T>): number => match(list, {
   Cons: ({ tail }) => 1 + len(tail)
 });
 
-const size = len(Cons({ head: 1, tail: Cons({ head: 2, tail: Nil({}) }) }));
+const same = <T>(a: List<T>, b: List<T>): boolean => matchMany([a, b], {
+  'Nil Nil': () => true,
+  'Cons Cons': (l, r) => l.head === r.head && same(l.tail, r.tail),
+  _: () => false,
+});
 
-// size is 2
-console.log(size);
+console.log(len(Cons({ head: 1, tail: Cons({ head: 2, tail: Nil({}) }) }))); // 2
+console.log(same(Nil({}), Nil({}))); // true
+console.log(same(Cons({ head: 1, tail: Nil({}) }), Nil({}))); // false

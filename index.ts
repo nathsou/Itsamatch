@@ -11,9 +11,9 @@ export type Variant<
  * Maps each property in `T` to a Variant constructed with the associated type
  * @example
  * type Vehicle = DataType<{
- *     Bike: { wheelSize: number },
- *     Unicycle: { year: number, wheelSize: number },
- *     Car: { color: 'red' | 'blue' }
+ *   Bike: { wheelSize: number },
+ *   Unicycle: { year: number, wheelSize: number },
+ *   Car: { color: 'red' | 'blue' }
  * }>;
  */
 export type DataType<
@@ -55,22 +55,23 @@ type CasesWithDefault<T extends Variant<string, Tag>, Tag extends string, R = an
   Cases<T, R, Tag> | (Partial<Cases<T, R, Tag>> & { _: (val: T) => R });
 
 /**
- * @param val A variant of data-type `DT`
+ * @param value A variant of data-type `DT`
  * @param cases An object mapping each variant name to a handler function
- * @returns The result of calling the function associated to `val`'s variant with `val`
+ * @param tag the variant tag used in DT's definition
+ * @returns The result of calling the function associated to `value`'s variant with `value`
  * @example
 * type Vehicle = DataType<{
-*     Bike: { wheelSize: number },
-*     Unicycle: { year: number, wheelSize: number },
-*     Car: { color: 'red' | 'blue' }
+*   Bike: { wheelSize: number },
+*   Unicycle: { year: number, wheelSize: number },
+*   Car: { color: 'red' | 'blue' }
 * }>;
 * 
 * const vehicleComment = (vehicle: Vehicle) => match(vehicle, {
-*     Bike: () => `I don't use my bike very often nowadays`,
-*     Unicycle: ({ year, wheelSize }) => {
-*         return `I received my unicycle in ${year}, it has a wheel of ${wheelSize} inches in diameter`
-*     },
-*     _: ({ variant: vehicleName }) => `I do not own a ${vehicleName}`
+*   Bike: () => `I don't use my bike very often nowadays`,
+*   Unicycle: ({ year, wheelSize }) => {
+*     return `I received my unicycle in ${year}, it has a wheel of ${wheelSize} inches in diameter`
+*   },
+*   _: ({ variant: vehicleName }) => `I do not own a ${vehicleName}`
 * });
  */
 export const match = <
@@ -78,17 +79,97 @@ export const match = <
   M extends CasesWithDefault<DT, Tag>,
   Tag extends string = 'variant',
   >(
-    val: DT,
+    value: DT,
     cases: M,
     tag: Tag = 'variant' as Tag
   ): Ret<M> => {
-  if (val[tag] in cases) {
-    const handler = (cases as Record<string, (arg: DT) => Ret<M>>)[val[tag]];
-    return handler(val);
+  if (value[tag] in cases) {
+    const handler = (cases as Record<string, (arg: DT) => Ret<M>>)[value[tag]];
+    return handler(value);
   }
 
-  const defaultHandler = (cases as Record<'_', (arg: DT) => Ret<M>>)['_'];
-  return defaultHandler(val);
+  if ('_' in cases) {
+    return cases['_'](value);
+  }
+
+  throw new Error(`Unhandled ${tag}: '${value[tag]}'`);
+};
+
+type VariantNames<DTs, Tag extends string, Acc extends string[] = []> =
+  DTs extends [] ? Acc :
+  DTs extends [infer DT extends Variant<string, Tag>, ...infer Tail] ?
+  VariantNames<Tail, Tag, [...Acc, DT[Tag]]> : never;
+
+type JoinStrings<Strs, Acc extends string = ''> =
+  Strs extends [] ? Acc :
+  Strs extends [infer S extends string] ? `${Acc}${S}` :
+  Strs extends [infer S extends string, ...infer Tail] ? JoinStrings<Tail, `${S} ${Acc}`> : never;
+
+type ManyCasesKeys<DTs extends readonly Variant<string, Tag>[], Tag extends string> = JoinStrings<VariantNames<DTs, Tag>>;
+
+
+type Split<S extends string, Sep extends string, Acc extends string[] = []> =
+  S extends `${infer H}${Sep}${infer Tail}` ? Split<Tail, Sep, [...Acc, H]> : [...Acc, S];
+
+type Zip<As extends readonly any[], Bs extends readonly any[], Acc extends [any, any][] = []> =
+  As extends [] ? Acc :
+  Bs extends [] ? Acc :
+  As extends [infer A, ...infer As] ? Bs extends [infer B, ...infer Bs] ? Zip<As, Bs, [...Acc, [A, B]]> : never : never;
+
+type VariantsOf<DTs extends readonly any[], Names extends string[], Tag extends string> =
+  VariantsOfAux1<Zip<DTs, Names>, Tag>;
+
+type VariantsOfAux1<T extends [any, any][], Tag extends string> =
+  T extends [Variant<string, Tag>, string][] ? VariantsOfAux2<T, Tag> : never;
+
+type VariantsOfAux2<T, Tag extends string, Acc extends any[] = []> =
+  T extends [] ? Acc :
+  T extends [[infer DT extends Variant<string, Tag>, infer Name], ...infer Tail] ?
+  Name extends DT[Tag] ? VariantsOfAux2<Tail, Tag, [...Acc, VariantOf<DT, Name, Tag>]> : Acc : Acc;
+
+/**
+ * Maps each variant of `DTs` to a handler function returning `R`
+ */
+type ManyCases<DTs extends readonly Variant<string, Tag>[], Tag extends string, R = any> = {
+  [V in ManyCasesKeys<DTs, Tag>]: ((...args: VariantsOf<DTs, Split<V, ' '>, Tag>) => R)
+};
+
+type ManyCasesWithDefault<DTs extends readonly Variant<string, Tag>[], Tag extends string, R = any> =
+  ManyCases<DTs, Tag, R> | (Partial<ManyCases<DTs, Tag, R>> & { _: (...values: DTs) => R });
+
+/**
+* @param values A tuple of data-types
+* @param cases An object mapping each variant combination to a handler function
+ * @param tag the variant tag used in DTs' definitions
+* @returns The result of calling the function associated to the respective variants with `values`
+* @example
+* type List = DataType<{
+*   Nil: {},
+*   Cons: { head: number, tail: List }
+* }>;
+* 
+* const same = <T>(a: List<T>, b: List<T>): boolean => matchMany([a, b], {
+*   'Nil Nil': () => true,
+*   'Cons Cons': (l, r) => l.head === r.head && same(l.tail, r.tail),
+*   _: () => false,
+* });
+*/
+export const matchMany = <
+  DTs extends readonly Variant<string, Tag>[],
+  Cases extends ManyCasesWithDefault<DTs, Tag>,
+  Tag extends string = 'variant'
+>(values: [...DTs], cases: Cases, tag: Tag = 'variant' as Tag): Ret<Cases> => {
+  const key = values.map(v => v[tag]).join(' ');
+
+  if (key in cases) {
+    return cases[key](...values);
+  }
+
+  if ('_' in cases) {
+    return cases['_'](...values);
+  }
+
+  throw new Error(`Unhandled ${tag}: '${key}'`);
 };
 
 type VariantConstructor<

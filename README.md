@@ -7,7 +7,7 @@ Itsamatch is a tiny set of types and utilities to define and use variants / tagg
 
 ## Usage
 
-itsamatch exposes two functions and a few types that make it easier to construct data types.
+itsamatch exposes three functions (match, matchMany, genConstructors) and a few types that make it easier to construct data types.
 Below is a simple example showing how it can be used to create a [linked list data type](https://en.wikipedia.org/wiki/Cons#Lists) :
 
 ```typescript
@@ -28,8 +28,15 @@ const len = <T>(list: List<T>): number => match(list, {
     Cons: ({ tail }) => 1 + len(tail)
 });
 
-// size is 2
-const size = len(Cons({ head: 1, tail: Cons({ head: 2, tail: Nil({}) }) }));
+const same = <T>(a: List<T>, b: List<T>): boolean => matchMany([a, b], {
+  'Nil Nil': () => true,
+  'Cons Cons': (l, r) => l.head === r.head && same(l.tail, r.tail),
+  _: () => false,
+});
+
+const size = len(Cons({ head: 1, tail: Cons({ head: 2, tail: Nil({}) }) })); // 2
+const sameElems = same(Cons({ head: 1, tail: Nil({}) }), Nil({})); // false
+
 ```
 
 More examples are available in the /examples folder

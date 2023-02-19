@@ -34,8 +34,8 @@ const same = <T>(a: List<T>, b: List<T>): boolean => matchMany([a, b], {
   _: () => false,
 });
 
-const size = len(Cons({ head: 1, tail: Cons({ head: 2, tail: Nil({}) }) })); // 2
-const sameElems = same(Cons({ head: 1, tail: Nil({}) }), Nil({})); // false
+const size = len(Cons({ head: 1, tail: Cons({ head: 2, tail: Nil() }) })); // 2
+const sameElems = same(Cons({ head: 1, tail: Nil() }), Nil()); // false
 
 ```
 

@@ -18,6 +18,6 @@ const same = <T>(a: List<T>, b: List<T>): boolean => matchMany([a, b], {
   _: () => false,
 });
 
-console.log(len(Cons({ head: 1, tail: Cons({ head: 2, tail: Nil({}) }) }))); // 2
-console.log(same(Nil({}), Nil({}))); // true
-console.log(same(Cons({ head: 1, tail: Nil({}) }), Nil({}))); // false
+console.log(len(Cons({ head: 1, tail: Cons({ head: 2, tail: Nil() }) }))); // 2
+console.log(same(Nil(), Nil())); // true
+console.log(same(Cons({ head: 1, tail: Nil() }), Nil())); // false

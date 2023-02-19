@@ -1,16 +1,16 @@
-import { DataType, match, VariantOf, genConstructors } from '..';
+import { DataType, match, VariantOf, genConstructors, matchMany } from '..';
 
 // Simple evaluator for an extension of the lambda calculus
 
 // describe a Value type by providing 
 // the names and arguments for every variant
 type Value = DataType<{
-  Num: { data: number },
-  Bool: { data: boolean },
+  Num: number,
+  Bool: boolean,
   Nil: {},
   Cons: { head: Value, tail: Value },
   Closure: { arg: string, body: Expr, env: Env },
-  RecClosure: { name: string, arg: string, body: Expr, env: Env }
+  RecClosure: { name: string, arg: string, body: Expr, env: Env },
 }>;
 
 type BinaryOperator =
@@ -21,7 +21,7 @@ type Expr = DataType<{
   Const: { value: Value },
   MonOp: { op: 'neg' | 'not', expr: Expr },
   BinOp: { op: BinaryOperator, left: Expr, right: Expr },
-  Var: { name: string },
+  Var: string,
   LetIn: { arg: string, valExpr: Expr, inExpr: Expr },
   If: { condExpr: Expr, thenExpr: Expr, elseExpr: Expr },
   Lambda: { arg: string, body: Expr },
@@ -36,11 +36,13 @@ const { Bool, Num, Closure, RecClosure, Cons, Nil } = genConstructors<Value>([
 ]);
 
 const {
-  Const, BinOp, Var,
+  BinOp, Var,
   If, Lambda, App, LetRecIn
 } = genConstructors<Expr>([
-  'Const', 'MonOp', 'BinOp', 'Var', 'LetIn', 'If', 'Lambda', 'App', 'LetRecIn'
+  'MonOp', 'BinOp', 'Var', 'LetIn', 'If', 'Lambda', 'App', 'LetRecIn'
 ]);
+
+const Const = (value: Value): Expr => ({ variant: 'Const', value });
 
 // an environment is a mapping from variable names to values
 type Env = { [K in string]: Value };
@@ -50,7 +52,7 @@ const numOf = (expr: Expr, env: Env): number => {
   const v = evaluate(expr, env);
 
   if (v.variant === 'Num') {
-    return v.data;
+    return v.$value;
   }
 
   throw new Error(`Expected an Num, got: ${v.variant}`);
@@ -61,7 +63,7 @@ const boolOf = (expr: Expr, env: Env): boolean => {
   const v = evaluate(expr, env);
 
   if (v.variant === 'Bool') {
-    return v.data;
+    return v.$value;
   }
 
   throw new Error(`Expected a Bool, got: ${v.variant}`);
@@ -78,7 +80,7 @@ const numBinOp = (
   left: Expr,
   right: Expr
 ): Value => {
-  return NumVal(op(numOf(left, env), numOf(right, env)));
+  return Num(op(numOf(left, env), numOf(right, env)));
 };
 
 const boolBinOp = (
@@ -87,17 +89,16 @@ const boolBinOp = (
   left: Expr,
   right: Expr
 ): Value => {
-  return BoolVal(op(numOf(left, env), numOf(right, env)));
+  return Bool(op(numOf(left, env), numOf(right, env)));
 };
 
-const valuesEq = (a: Value, b: Value): boolean => match(a, {
-  Num: ({ data }) => b.variant === 'Num' && b.data === data,
-  Bool: ({ data }) => b.variant === 'Bool' && b.data === data,
-  _: () => a === b
+const valuesEq = (a: Value, b: Value): boolean => matchMany([a, b], {
+  'Num Num': (n, m) => n === m,
+  'Bool Bool': (q, r) => q === r,
+  'Nil Nil': () => true,
+  'Cons Cons': (c, d) => valuesEq(c.head, d.head) && valuesEq(c.tail, d.tail),
+  _: () => false
 });
-
-const BoolVal = (q: boolean): VariantOf<Value, 'Bool'> => Bool({ data: q });
-const NumVal = (n: number): VariantOf<Value, 'Num'> => Num({ data: n });
 
 /**
  * evaluates `expr` in `env`,
@@ -107,8 +108,8 @@ const evaluate = (expr: Expr, env: Env): Value => match(expr, {
   Const: ({ value }) => value,
   MonOp: ({ op, expr }) => {
     switch (op) {
-      case 'neg': return NumVal(-numOf(expr, env));
-      case 'not': return BoolVal(!boolOf(expr, env));
+      case 'neg': return Num(-numOf(expr, env));
+      case 'not': return Bool(!boolOf(expr, env));
     }
   },
   BinOp: ({ op, left, right }) => {
@@ -122,12 +123,12 @@ const evaluate = (expr: Expr, env: Env): Value => match(expr, {
       case 'leq': return boolBinOp((a, b) => a <= b, env, left, right);
       case 'gtr': return boolBinOp((a, b) => a > b, env, left, right);
       case 'geq': return boolBinOp((a, b) => a >= b, env, left, right);
-      case 'eq': return BoolVal(valuesEq(evaluate(left, env), evaluate(right, env)));
-      case 'neq': return BoolVal(!valuesEq(evaluate(left, env), evaluate(right, env)));
+      case 'eq': return Bool(valuesEq(evaluate(left, env), evaluate(right, env)));
+      case 'neq': return Bool(!valuesEq(evaluate(left, env), evaluate(right, env)));
       case 'cons': return Cons({ head: evaluate(left, env), tail: evaluate(right, env) });
     }
   },
-  Var: ({ name }) => {
+  Var: name => {
     if (name in env) {
       return env[name];
     }
@@ -173,22 +174,24 @@ const factorial = (n: number) => LetRecIn({
   name: 'f',
   arg: 'n',
   body: If({
-    condExpr: BinOp({ left: Var({ name: 'n' }), op: 'eq', right: Const({ value: Num({ data: 0 }) }) }),
-    thenExpr: Const({ value: Num({ data: 1 }) }),
+    condExpr: BinOp({
+      left: Var('n'), op: 'eq', right: Const(Num(0))
+    }),
+    thenExpr: Const(Num(1)),
     elseExpr: BinOp({
-      left: Var({ name: 'n' }),
+      left: Var('n'),
       op: 'times',
       right: App({
-        left: Var({ name: 'f' }),
+        left: Var('f'),
         right: BinOp({
-          left: Var({ name: 'n' }),
+          left: Var('n'),
           op: 'minus',
-          right: Const({ value: Num({ data: 1 }) })
+          right: Const(Num(1))
         })
       })
     })
   }),
-  inExpr: App({ left: Var({ name: 'f' }), right: Const({ value: Num({ data: n }) }) })
+  inExpr: App({ left: Var('f'), right: Const(Num(n)) })
 });
 
 const listPrimes = (upTo: number) => LetRecIn({
@@ -197,14 +200,14 @@ const listPrimes = (upTo: number) => LetRecIn({
   body: Lambda({
     arg: 'acc',
     body: If({
-      condExpr: BinOp({ left: Var({ name: 'i' }), op: 'gtr', right: Const({ value: Num({ data: 0 }) }) }),
+      condExpr: BinOp({ left: Var('i'), op: 'gtr', right: Const(Num(0)) }),
       thenExpr: App({
         left: App({
-          left: Var({ name: 'listPrimes' }),
+          left: Var('listPrimes'),
           right: BinOp({
-            left: Var({ name: 'i' }),
+            left: Var('i'),
             op: 'minus',
-            right: Const({ value: Num({ data: 1 }) })
+            right: Const(Num(1))
           })
         }),
         right: If({
@@ -214,68 +217,68 @@ const listPrimes = (upTo: number) => LetRecIn({
             body: Lambda({
               arg: 'i',
               body: If({
-                condExpr: BinOp({ left: Var({ name: 'n' }), op: 'lss', right: Const({ value: Num({ data: 2 }) }) }),
-                thenExpr: Const({ value: Bool({ data: false }) }),
+                condExpr: BinOp({ left: Var('n'), op: 'lss', right: Const(Num(2)) }),
+                thenExpr: Const(Bool(false)),
                 elseExpr: If({
-                  condExpr: BinOp({ left: Var({ name: 'n' }), op: 'eq', right: Const({ value: Num({ data: 2 }) }) }),
-                  thenExpr: Const({ value: Bool({ data: true }) }),
+                  condExpr: BinOp({ left: Var('n'), op: 'eq', right: Const(Num(2)) }),
+                  thenExpr: Const(Bool(true)),
                   elseExpr: If({
                     condExpr: BinOp({
-                      left: BinOp({ left: Var({ name: 'n' }), op: 'mod', right: Const({ value: Num({ data: 2 }) }) }),
+                      left: BinOp({ left: Var('n'), op: 'mod', right: Const(Num(2)) }),
                       op: 'eq',
-                      right: Const({ value: Num({ data: 0 }) })
+                      right: Const(Num(0))
                     }),
-                    thenExpr: Const({ value: Bool({ data: false }) }),
+                    thenExpr: Const(Bool(false)),
                     elseExpr: If({
                       condExpr: BinOp({
-                        left: BinOp({ left: Var({ name: 'i' }), op: 'times', right: Var({ name: 'i' }) }),
+                        left: BinOp({ left: Var('i'), op: 'times', right: Var('i') }),
                         op: 'leq',
-                        right: Var({ name: 'n' })
+                        right: Var('n')
                       }),
                       thenExpr: If({
                         condExpr: BinOp({
-                          left: BinOp({ left: Var({ name: 'n' }), op: 'mod', right: Var({ name: 'i' }) }),
+                          left: BinOp({ left: Var('n'), op: 'mod', right: Var('i') }),
                           op: 'eq',
-                          right: Const({ value: Num({ data: 0 }) })
+                          right: Const(Num(0))
                         }),
-                        thenExpr: Const({ value: Bool({ data: false }) }),
+                        thenExpr: Const(Bool(false)),
                         elseExpr: App({
-                          left: App({ left: Var({ name: 'isPrime' }), right: Var({ name: 'n' }) }),
+                          left: App({ left: Var('isPrime'), right: Var('n') }),
                           right: BinOp({
-                            left: Var({ name: 'i' }),
+                            left: Var('i'),
                             op: 'plus',
-                            right: Const({ value: Num({ data: 2 }) })
+                            right: Const(Num(2))
                           })
                         })
                       }),
-                      elseExpr: Const({ value: Bool({ data: true }) })
+                      elseExpr: Const(Bool(true))
                     })
                   })
                 })
               })
             }),
             inExpr: App({
-              left: App({ left: Var({ name: 'isPrime' }), right: Var({ name: 'i' }) }),
-              right: Const({ value: Num({ data: 3 }) })
+              left: App({ left: Var('isPrime'), right: Var('i') }),
+              right: Const(Num(3))
             })
           }),
-          thenExpr: BinOp({ op: 'cons', left: Var({ name: 'i' }), right: Var({ name: 'acc' }) }),
-          elseExpr: Var({ name: 'acc' })
+          thenExpr: BinOp({ op: 'cons', left: Var('i'), right: Var('acc') }),
+          elseExpr: Var('acc')
         })
       }),
-      elseExpr: Var({ name: 'acc' })
+      elseExpr: Var('acc')
     })
   }),
   inExpr: App({
-    left: App({ left: Var({ name: 'listPrimes' }), right: Const({ value: Num({ data: upTo }) }) }),
-    right: Const({ value: Nil({}) })
+    left: App({ left: Var('listPrimes'), right: Const(Num(upTo)) }),
+    right: Const(Nil())
   })
 });
 
 /**
  * converts a Cons Value into an array of values
  */
-const arrayOf = ({ head, tail }: VariantOf<Value, 'Cons'>): Array<Value> => match(tail, {
+const arrayOf = ({ head, tail }: VariantOf<Value, 'Cons'>): Value[] => match(tail, {
   Nil: () => [head],
   Cons: list => [head, ...arrayOf(list)],
   _: ({ variant }) => { throw new Error(`Cannot call 'arrayOf' on a '${variant}'`) }
@@ -285,8 +288,8 @@ const arrayOf = ({ head, tail }: VariantOf<Value, 'Cons'>): Array<Value> => matc
  * formats a value into a string
  */
 const showValue = (val: Value): string => match(val, {
-  Num: ({ data: n }) => `${n}`,
-  Bool: ({ data: q }) => q ? 'True' : 'False',
+  Num: n => `${n}`,
+  Bool: q => q ? 'True' : 'False',
   Nil: () => '[]',
   Closure: ({ arg: x }) => `\\${x} -> <...>`,
   RecClosure: ({ name: f, arg: x }) => `let rec ${f} ${x} -> <...>`,

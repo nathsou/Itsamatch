@@ -5,7 +5,11 @@ export type Variant<
   Name extends string,
   Tag extends string = 'variant',
   Props extends Record<string, any> = {},
-  > = { [K in Tag]: Name } & Props;
+> = { [K in Tag]: Name } & Props;
+
+const WRAPPED_VALUE_KEY = '$value';
+type WrappedValueKey = typeof WRAPPED_VALUE_KEY;
+type IsWrappedValue<T> = T extends { [WRAPPED_VALUE_KEY]: any } ? { [WRAPPED_VALUE_KEY]: any } extends T ? true : false : false;
 
 /**
  * Maps each property in `T` to a Variant constructed with the associated type
@@ -17,11 +21,11 @@ export type Variant<
  * }>;
  */
 export type DataType<
-  T extends { [K in keyof T]: Record<string, any> },
+  T extends { [K in keyof T]: any },
   Tag extends string = 'variant'
-  > = {
-    [K in keyof T]: K extends string ? Variant<K, Tag, T[K]> : never
-  }[keyof T];
+> = {
+  [K in keyof T]: K extends string ? T[K] extends Record<string, any> ? Variant<K, Tag, T[K]> : Variant<K, Tag, { [WRAPPED_VALUE_KEY]: T[K] }> : never
+}[keyof T];
 
 /**
  * Returns the type of the variant named `Name` in the data-type `T`
@@ -30,7 +34,7 @@ export type VariantOf<
   T extends Variant<string, Tag>,
   Name extends T[Tag],
   Tag extends string = 'variant'
-  > = T & Variant<Name, Tag>;
+> = T & Variant<Name, Tag>;
 
 /**
  * Returns the union of the return types of every function in `T`
@@ -39,13 +43,13 @@ type Ret<T> = {
   [K in keyof T]: T[K] extends (...args: any) => infer R ? R : never
 }[keyof T];
 
+type CaseArg<T extends Record<string, any>, Tag extends string> = IsWrappedValue<Omit<T, Tag>> extends true ? T[WrappedValueKey] : T;
+
 /**
- * Maps each variant of `DT` to a handler function returning `R`
+ * Maps each variant of `DT` to an handler function returning `R`
  */
 type Cases<DT extends Variant<string, Tag>, R, Tag extends string> = {
-  [V in DT[Tag]]: ((args: {
-    [K in keyof (DT & Variant<V, Tag>)]: (DT & Variant<V, Tag>)[K]
-  }) => R)
+  [V in DT[Tag]]: (arg: CaseArg<DT & Variant<V, Tag>, Tag>) => R
 };
 
 /**
@@ -78,18 +82,18 @@ export const match = <
   DT extends Variant<string, Tag>,
   M extends CasesWithDefault<DT, Tag>,
   Tag extends string = 'variant',
-  >(
-    value: DT,
-    cases: M,
-    tag: Tag = 'variant' as Tag
-  ): Ret<M> => {
+>(
+  value: DT,
+  cases: M,
+  tag: Tag = 'variant' as Tag
+): Ret<M> => {
   if (value[tag] in cases) {
-    const handler = (cases as Record<string, (arg: DT) => Ret<M>>)[value[tag]];
-    return handler(value);
+    const handler = (cases as Record<string, (arg: any) => Ret<M>>)[value[tag]];
+    return handler(WRAPPED_VALUE_KEY in value ? value[WRAPPED_VALUE_KEY] : value);
   }
 
   if ('_' in cases) {
-    return cases['_'](value);
+    return cases['_'](WRAPPED_VALUE_KEY in value ? value[WRAPPED_VALUE_KEY] as any : value);
   }
 
   throw new Error(`Unhandled ${tag}: '${value[tag]}'`);
@@ -106,7 +110,6 @@ type JoinStrings<Strs, Acc extends string = ''> =
   Strs extends [infer S extends string, ...infer Tail] ? JoinStrings<Tail, `${S} ${Acc}`> : never;
 
 type ManyCasesKeys<DTs extends readonly Variant<string, Tag>[], Tag extends string> = JoinStrings<VariantNames<DTs, Tag>>;
-
 
 type Split<S extends string, Sep extends string, Acc extends string[] = []> =
   S extends `${infer H}${Sep}${infer Tail}` ? Split<Tail, Sep, [...Acc, H]> : [...Acc, S];
@@ -127,11 +130,15 @@ type VariantsOfAux2<T, Tag extends string, Acc extends any[] = []> =
   T extends [[infer DT extends Variant<string, Tag>, infer Name], ...infer Tail] ?
   Name extends DT[Tag] ? VariantsOfAux2<Tail, Tag, [...Acc, VariantOf<DT, Name, Tag>]> : Acc : Acc;
 
+type MapCaseArgs<DTs extends readonly any[], Tag extends string> =
+  DTs extends [infer Head extends Record<string, any>, ...infer Tail extends any[]]
+  ? [CaseArg<Head, Tag>, ...MapCaseArgs<Tail, Tag>] : [];
+
 /**
  * Maps each variant of `DTs` to a handler function returning `R`
  */
 type ManyCases<DTs extends readonly Variant<string, Tag>[], Tag extends string, R = any> = {
-  [V in ManyCasesKeys<DTs, Tag>]: ((...args: VariantsOf<DTs, Split<V, ' '>, Tag>) => R)
+  [V in ManyCasesKeys<DTs, Tag>]: ((...args: MapCaseArgs<VariantsOf<DTs, Split<V, ' '>, Tag>, Tag>) => R)
 };
 
 type ManyCasesWithDefault<DTs extends readonly Variant<string, Tag>[], Tag extends string, R = any> =
@@ -160,41 +167,55 @@ export const matchMany = <
   Tag extends string = 'variant'
 >(values: [...DTs], cases: Cases, tag: Tag = 'variant' as Tag): Ret<Cases> => {
   const key = values.map(v => v[tag]).join(' ');
+  const vals = values.map(v => WRAPPED_VALUE_KEY in v ? v[WRAPPED_VALUE_KEY] : v);
 
   if (key in cases) {
-    return (cases as Record<string, (...args: DTs) => Ret<Cases>>)[key](...values);
+    return (cases as Record<string, (...args: any[]) => Ret<Cases>>)[key](...vals);
   }
 
   if ('_' in cases) {
-    return cases['_'](...values);
+    return (cases as Record<'_', any>)['_'](...vals);
   }
 
   throw new Error(`Unhandled ${tag}: '${key}'`);
 };
 
+type VariantConstructorArg<T extends Record<string, any>, Tag extends string> = IsWrappedValue<Omit<T, Tag>> extends true ?
+  T[WrappedValueKey] : Omit<T, Tag>;
+
+type IsEmptyRecord<T> = keyof T extends never ? true : false;
+
 type VariantConstructor<
   T extends Variant<string, Tag>,
   Name extends T[Tag],
   Tag extends string
-  > =
-  (args: Omit<VariantOf<T, Name, Tag>, Tag>) => VariantOf<T, Name, Tag>;
+> =
+  IsEmptyRecord<Omit<VariantOf<T, Name, Tag>, Tag>> extends true ? () => VariantOf<T, Name, Tag> :
+  (arg: VariantConstructorArg<VariantOf<T, Name, Tag>, Tag>) => VariantOf<T, Name, Tag>;
 
 const constructorOf = <
   T extends Variant<string, Tag>,
   Name extends T[Tag],
   Tag extends string
->(variant: Name, tag: Tag) => {
-  return (args => ({
-    [tag]: variant,
-    ...args
-  })) as VariantConstructor<VariantOf<T, Name, Tag>, VariantOf<T, Name, Tag>[Tag], Tag>;
+>(variant: Name, tag: Tag): VariantConstructor<T, Name, Tag> => {
+  return (arg?: any) => {
+    if (arg === undefined) {
+      return { [tag]: variant };
+    }
+
+    if (typeof arg === 'object' && arg != null && !Array.isArray(arg)) {
+      return { [tag]: variant, ...arg };
+    }
+
+    return { [tag]: variant, [WRAPPED_VALUE_KEY]: arg };
+  };
 };
 
 type VariantConstructors<
   T extends Variant<string, Tag>,
   Names extends T[Tag],
   Tag extends string
-  > = {
+> = {
     [V in Names]: VariantConstructor<VariantOf<T, V, Tag>, VariantOf<T, V, Tag>[Tag], Tag>
   };
 
@@ -216,7 +237,7 @@ export const genConstructors = <
   DT extends Variant<string, Tag>,
   Tag extends string = 'variant',
   Variants extends DT[Tag] = DT[Tag],
-  >(variants: Variants[], tag = 'variant' as Tag): VariantConstructors<DT, Variants, Tag> => {
+>(variants: Variants[], tag = 'variant' as Tag): VariantConstructors<DT, Variants, Tag> => {
   type R = VariantConstructors<DT, Variants, Tag>;
   return variants.reduce<R>((ctors, variant) => {
     /// @ts-ignore

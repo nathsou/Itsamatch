@@ -1,4 +1,4 @@
-import { DataType, genConstructors, match, matchMany } from "..";
+import { DataType, constructors, match, matchMany } from "..";
 
 // A term is either a variable or a function
 type Term = DataType<{
@@ -7,7 +7,7 @@ type Term = DataType<{
 }>;
 
 // generate constructors for Var and Fun
-const { Var, Fun } = genConstructors<Term>(['Var', 'Fun']);
+const { Var, Fun } = constructors<Term>().get('Var', 'Fun');
 
 const showTerm = (term: Term): string => match(term, {
   Var: name => name,

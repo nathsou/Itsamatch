@@ -7,7 +7,7 @@ export type Variant<
   Props extends Record<string, any> = {},
 > = { [K in Tag]: Name } & Props;
 
-const WRAPPED_VALUE_KEY = '$value';
+export const WRAPPED_VALUE_KEY = '$value';
 type WrappedValueKey = typeof WRAPPED_VALUE_KEY;
 type IsWrappedValue<T> = T extends { [WRAPPED_VALUE_KEY]: any } ? { [WRAPPED_VALUE_KEY]: any } extends T ? true : false : false;
 
@@ -219,6 +219,8 @@ type VariantConstructors<
     [V in Names]: VariantConstructor<VariantOf<T, V, Tag>, VariantOf<T, V, Tag>[Tag], Tag>
   };
 
+type ElementType<T extends readonly any[]> = T extends readonly (infer U)[] ? U : never;
+
 /**
  * Generates default variant constructors for data-type `DT`
  * @example 
@@ -228,20 +230,29 @@ type VariantConstructors<
  *     Car: { color: 'red' | 'blue' }
  * }>;
  * 
- * const { Bike, Unicycle } = genConstructors<Vehicle>(['Bike', 'Unicycle']);
+ * const { Bike, Unicycle } = constructors<Vehicle>().get('Bike', 'Unicycle');
  * 
  * const uni = Unicycle({ year: 2017, wheelSize: 36 });
  * 
  */
-export const genConstructors = <
+export const constructors = <
   DT extends Variant<string, Tag>,
   Tag extends string = 'variant',
-  Variants extends DT[Tag] = DT[Tag],
->(variants: Variants[], tag = 'variant' as Tag): VariantConstructors<DT, Variants, Tag> => {
-  type R = VariantConstructors<DT, Variants, Tag>;
-  return variants.reduce<R>((ctors, variant) => {
-    /// @ts-ignore
-    ctors[variant] = constructorOf<DT>(variant, tag);
-    return ctors;
-  }, {} as R);
+>(tag = 'variant' as Tag) => {
+  return {
+    get: <const Variants extends readonly DT[Tag][]>(...variants: Variants) => {
+      type Ctors = VariantConstructors<DT, ElementType<Variants>, Tag>;
+      const ctors: Partial<Ctors> = {};
+    
+      for (const variant of variants) {
+        /// @ts-ignore
+        ctors[variant] = constructorOf<DT>(variant, tag);
+      }
+    
+      return ctors as Ctors;
+    },
+    getOne: <const Variant extends DT[Tag]>(variant: Variant) => {
+      return constructorOf<DT, Variant, Tag>(variant, tag);
+    },
+  };
 };

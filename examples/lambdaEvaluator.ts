@@ -1,4 +1,4 @@
-import { DataType, match, VariantOf, genConstructors, matchMany } from '..';
+import { DataType, match, VariantOf, constructors, matchMany } from '..';
 
 // Simple evaluator for an extension of the lambda calculus
 
@@ -31,16 +31,16 @@ type Expr = DataType<{
 
 // generate constructors for all the needed variants
 
-const { Bool, Num, Closure, RecClosure, Cons, Nil } = genConstructors<Value>([
-  'Bool', 'Num', 'Nil', 'Cons', 'Closure', 'RecClosure'
-]);
+const { Bool, Num, Closure, RecClosure, Cons, Nil } = constructors<Value>().get(
+  'Bool', 'Num', 'Nil', 'Cons', 'Closure', 'RecClosure',
+);
 
 const {
   BinOp, Var,
   If, Lambda, App, LetRecIn
-} = genConstructors<Expr>([
-  'MonOp', 'BinOp', 'Var', 'LetIn', 'If', 'Lambda', 'App', 'LetRecIn'
-]);
+} = constructors<Expr>().get(
+  'MonOp', 'BinOp', 'Var', 'LetIn', 'If', 'Lambda', 'App', 'LetRecIn',
+);
 
 const Const = (value: Value): Expr => ({ variant: 'Const', value });
 

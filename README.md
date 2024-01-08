@@ -11,7 +11,7 @@ itsamatch exposes three functions (match, matchMany, genConstructors) and a few 
 Below is a simple example showing how it can be used to create a [linked list data type](https://en.wikipedia.org/wiki/Cons#Lists) :
 
 ```typescript
-import { DataType, genConstructors, match } from 'itsamatch';
+import { DataType, constructors, match } from 'itsamatch';
 
 // a list is a data type with two variants:
 type List<T> = DataType<{
@@ -20,7 +20,7 @@ type List<T> = DataType<{
 }>;
 
 // generate default variant constructors for lists of numbers
-const { Nil, Cons } = genConstructors<List<number>>(['Nil', 'Cons']);
+const { Nil, Cons } = constructors<List<number>>().get('Nil', 'Cons');
 
 // use the match function to compute the length of a list
 const len = <T>(list: List<T>): number => match(list, {

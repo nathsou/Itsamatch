@@ -1,11 +1,11 @@
-import { DataType, genConstructors, match, matchMany } from "..";
+import { DataType, constructors, match, matchMany } from "..";
 
 type List<T> = DataType<{
   Nil: {},
   Cons: { head: T, tail: List<T> }
 }>;
 
-const { Nil, Cons } = genConstructors<List<number>>(['Nil', 'Cons']);
+const { Nil, Cons } = constructors<List<number>>().get('Nil', 'Cons');
 
 const len = <T>(list: List<T>): number => match(list, {
   Nil: () => 0,

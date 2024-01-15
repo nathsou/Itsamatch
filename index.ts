@@ -256,3 +256,37 @@ export const constructors = <
     },
   };
 };
+
+type AugmentedReturnType<T extends Record<string, (...args: any[]) => any>, U extends () => any> = {
+  [K in keyof T]: T[K] extends (...args: infer A) => infer R ? (...args: A) => R & ReturnType<U> : T[K];
+}
+
+/**
+ * Augment object's functions with extra properties.
+ * @param obj Object to extend (only functions are affected)
+ * @param augmentFn Function which returns an object
+ * @example
+ * const { Apple, Pizza, NotAFunc } = augment({
+ *     Apple: (size: number) => ({ size }),
+ *     Pizza: (radius: number) => ({ radius }),
+ *     NotAFunc: { Somedata: 10 }
+ *   },
+ *   () => ({createdAt: new Date()})
+ * )
+ *
+ * Apple(10).createdAt; // = Date, ok
+ * Pizza(10).createdAt; // = Date, ok
+ * NotAFunc.createdAt; // = undefined, property does not exist
+ */
+export function augment<T extends Record<string, any>, U extends () => any>(obj: T, augmentFn: U): AugmentedReturnType<T, U> {
+  const augmentedObj = { ...obj }
+
+  Object.entries(augmentedObj)
+    .forEach(([variant, func]) => {
+      if (typeof func !== 'function') return
+      // @ts-expect-error Silence index errors
+      augmentedObj[variant] = (...arg: any[]) => ({ ...func.apply(obj, arg), ...augmentFn.apply(obj) })
+    })
+
+  return augmentedObj as unknown as AugmentedReturnType<T, U>
+}
